@@ -7,7 +7,13 @@ module Langfuse
         @client = client
       end
 
-      def create(id:, trace_id:, name:, value:, observation_id: nil, comment: nil, source: nil, data_type: nil, config_id: nil)
+      def create(id:, name:, value:, trace_id: nil, observation_id: nil, comment: nil, source: nil, data_type: nil, config_id: nil)
+        # For observation scores, we need both trace_id and observation_id
+        # For trace scores, we only need trace_id
+        if !observation_id && !trace_id
+          raise ArgumentError, "Must provide either trace_id or observation_id"
+        end
+
         event = {
           type: "score-create",
           id: SecureRandom.uuid,

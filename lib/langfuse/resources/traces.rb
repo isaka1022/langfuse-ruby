@@ -51,20 +51,27 @@ module Langfuse
       end
 
       def update(trace_id, name: nil, user_id: nil, session_id: nil, version: nil, release: nil, input: nil, output: nil, metadata: nil, tags: nil, public: nil)
-        data = {
-          name: name,
-          userId: user_id,
-          sessionId: session_id,
-          version: version,
-          release: release,
-          input: input,
-          output: output,
-          metadata: metadata,
-          tags: tags,
-          public: public
-        }.compact
+        # Trace updates are done by creating a new trace-create event with the same ID
+        # This will update the existing trace with new data
+        event = {
+          type: "trace-create",
+          id: SecureRandom.uuid,
+          body: {
+            id: trace_id,
+            name: name,
+            userId: user_id,
+            sessionId: session_id,
+            version: version,
+            release: release,
+            input: input,
+            output: output,
+            metadata: metadata,
+            tags: tags,
+            public: public
+          }.compact
+        }
 
-        @client.put("/api/public/traces/#{trace_id}", data)
+        @client.ingest([event])
       end
     end
   end

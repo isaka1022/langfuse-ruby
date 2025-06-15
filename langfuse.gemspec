@@ -2,7 +2,7 @@ Gem::Specification.new do |spec|
   spec.name          = "langfuse-ruby"
   spec.version       = "0.1.0"
   spec.authors       = ["isaka1022"]
-  spec.email         = ["isaka1022@gmail.com"]
+  spec.email         = []
 
   spec.summary       = "Ruby client for Langfuse API"
   spec.description   = "A Ruby gem for interacting with the Langfuse tracing and observability platform"

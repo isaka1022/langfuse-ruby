@@ -194,12 +194,34 @@ end
 | Resource     | create | get | list | update | delete |
 |-------------|:------:|:---:|:----:|:------:|:------:|
 | Traces       | ✓      | ✓   | ✓    | ✓      |        |
-| Observations | ✓      | ✓   | ✓    | ✓      |        |
+| Observations | ✓      | ✓   | ✓    | ✓ *    |        |
 | Scores       | ✓      | ✓   | ✓    |        | ✓      |
 | Prompts      | ✓      | ✓   | ✓    |        |        |
 | Datasets     | ✓      | ✓   | ✓    |        |        |
 | Dataset Items| ✓      | ✓   | ✓    |        |        |
 | Dataset Runs | ✓      | ✓   | ✓    |        |        |
+
+\* `observations.update` calls `PUT /api/public/observations/:id`, which is not part of the official Langfuse API. It will be reworked to use ingestion-based span/generation updates in a future release (see Roadmap).
+
+## Roadmap
+
+### Now
+- **OTEL ingestion mode** — migrate from the deprecated `POST /api/public/ingestion` batch endpoint to OTLP/HTTP (`/api/public/otel/v1/traces`); required to keep the gem functional long-term
+- **`environment` field support** — pass environment to trace/observation bodies per the current Langfuse API
+- **Type-specific observation helpers** — `trace.generation()` / `trace.span()` / `trace.event()` convenience methods
+
+### Next
+- **Async batch flush** — background thread with `Mutex` to buffer and flush events non-blocking
+- **Sessions API** — create and retrieve sessions
+- **Score Configs API** — manage score configuration definitions
+- **Comments API** — attach and list comments on traces and observations
+- **Gem rename and RubyGems publish prep** — rename to `langfuse-client` (or similar available name) and publish to RubyGems.org
+
+### Later
+- **Rails Railtie** — auto-instrument via `ActiveSupport::Notifications` with zero config
+- **Models API** — retrieve model definitions from Langfuse
+- **`PromptTemplate` class** — typed wrapper with client-side variable interpolation
+- **Annotation Queues API** — support for annotation queue management
 
 ## Development
 

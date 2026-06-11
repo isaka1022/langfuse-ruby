@@ -2,7 +2,7 @@ Gem::Specification.new do |spec|
   spec.name          = "langfuse-ruby"
   spec.version       = "0.1.0"
   spec.authors       = ["isaka1022"]
-  spec.email         = ["your.email@example.com"]
+  spec.email         = ["isaka1022@gmail.com"]
 
   spec.summary       = "Ruby client for Langfuse API"
   spec.description   = "A Ruby gem for interacting with the Langfuse tracing and observability platform"
@@ -14,12 +14,7 @@ Gem::Specification.new do |spec|
   spec.metadata["source_code_uri"] = "https://github.com/isaka1022/langfuse-ruby"
   spec.metadata["changelog_uri"] = "https://github.com/isaka1022/langfuse-ruby/blob/main/CHANGELOG.md"
 
-  spec.files = Dir.chdir(__dir__) do
-    `git ls-files -z`.split("\x0").reject do |f|
-      (File.expand_path(f) == __FILE__) ||
-        f.start_with?(*%w[bin/ test/ spec/ features/ .git .circleci appveyor Gemfile])
-    end
-  end
+  spec.files = Dir.glob("{lib,exe}/**/*", base: __dir__) + ["LICENSE", "README.md"]
   spec.bindir = "exe"
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]

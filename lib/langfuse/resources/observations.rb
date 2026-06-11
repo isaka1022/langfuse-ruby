@@ -54,6 +54,8 @@ module Langfuse
         @client.get("/api/public/observations", params)
       end
 
+      # NOTE: PUT /api/public/observations/:id is not part of the official Langfuse API;
+      # will be reworked to use ingestion-based span/generation updates (see Roadmap).
       def update(observation_id, type: nil, name: nil, start_time: nil, end_time: nil, completion_start_time: nil, model: nil, model_parameters: nil, input: nil, output: nil, usage: nil, metadata: nil, level: nil, status_message: nil, version: nil)
         data = {
           type: type,

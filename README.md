@@ -1,168 +1,237 @@
-# Langfuse Ruby
+# langfuse-ruby
 
-A Ruby client library for the [Langfuse](https://langfuse.com) API - an open-source LLM observability and analytics platform.
+> **Unofficial Ruby client** for the [Langfuse](https://langfuse.com) API — an open-source LLM observability and analytics platform.
+>
+> Note: Official and community-maintained gems also exist on RubyGems ([langfuse-rb](https://rubygems.org/gems/langfuse-rb), [langfuse-ruby](https://rubygems.org/gems/langfuse-ruby)). This repository is a personal implementation built to explore the Langfuse API surface in Ruby.
+
+---
+
+## Overview
+
+This gem provides a lightweight Ruby interface to the Langfuse REST API. It supports the core observability primitives:
+
+- **Traces** — top-level execution contexts for LLM requests
+- **Observations** — individual steps within a trace (generations, spans, events)
+- **Scores** — numeric or categorical evaluations attached to traces or observations
+- **Prompts** — versioned prompt management (text and chat formats)
+- **Datasets** — evaluation datasets and dataset runs
+
+Events are sent via the `/api/public/ingestion` batch endpoint. Direct REST endpoints are used for reads.
+
+## Requirements
+
+- Ruby >= 2.7.0
 
 ## Installation
 
-Add this line to your application's Gemfile:
+Add to your Gemfile:
 
 ```ruby
-gem 'langfuse-ruby'
+gem 'langfuse-ruby', git: 'https://github.com/isaka1022/langfuse-ruby'
 ```
 
-And then execute:
+Then run:
 
 ```bash
 bundle install
 ```
 
-Or install it yourself as:
-
-```bash
-gem install langfuse-ruby
-```
-
-## Usage
-
-### Configuration
+## Configuration
 
 ```ruby
 require 'langfuse'
 
 Langfuse.configure do |config|
-  config.public_key = 'your_public_key'
-  config.secret_key = 'your_secret_key'
-  config.host = 'https://cloud.langfuse.com' # Optional, defaults to cloud.langfuse.com
+  config.public_key = ENV['LANGFUSE_PUBLIC_KEY']
+  config.secret_key = ENV['LANGFUSE_SECRET_KEY']
+  config.host       = 'https://cloud.langfuse.com' # optional; default shown
+  config.debug      = false                         # set true to log HTTP traffic
 end
-```
 
-### Creating Traces
-
-```ruby
 client = Langfuse.client
+```
 
+Self-hosted Langfuse: set `config.host` to your instance URL.
+
+## Usage
+
+### Traces
+
+```ruby
 # Create a trace
-trace = client.traces.create(
-  id: 'trace-123',
-  name: 'my-trace',
-  user_id: 'user-456',
-  input: { query: 'What is the weather like?' },
-  metadata: { version: '1.0' }
+client.traces.create(
+  id:       'trace-001',
+  name:     'chat-completion',
+  user_id:  'user-42',
+  input:    { query: 'What is the capital of France?' },
+  metadata: { env: 'production' },
+  tags:     ['chat', 'v2']
 )
 
-# Get a trace
-trace = client.traces.get('trace-123')
+# Retrieve
+trace = client.traces.get('trace-001')
 
-# List traces
-traces = client.traces.list(limit: 10, user_id: 'user-456')
+# List (supports page, limit, user_id, name, session_id, from_timestamp, tags)
+traces = client.traces.list(limit: 20, user_id: 'user-42')
 
-# Update a trace
-client.traces.update('trace-123', 
-  output: { response: 'The weather is sunny today.' }
-)
+# Update (re-ingests a trace-create event with the same ID)
+client.traces.update('trace-001', output: { answer: 'Paris' })
 ```
 
-### Creating Observations
+### Observations
+
+Observations represent individual steps — LLM calls (`GENERATION`), intermediate steps (`SPAN`), or discrete events (`EVENT`).
 
 ```ruby
-# Create an observation
-observation = client.observations.create(
-  id: 'obs-123',
-  trace_id: 'trace-123',
-  type: 'generation',
-  name: 'llm-call',
-  model: 'gpt-3.5-turbo',
-  input: { messages: [{ role: 'user', content: 'Hello' }] },
-  output: { content: 'Hi there!' },
-  usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }
+# Record an LLM generation
+client.observations.create(
+  id:       'obs-001',
+  trace_id: 'trace-001',
+  type:     'GENERATION',
+  name:     'openai-call',
+  model:    'gpt-4o',
+  input:    { messages: [{ role: 'user', content: 'What is the capital of France?' }] },
+  output:   { content: 'Paris' },
+  usage:    { prompt_tokens: 12, completion_tokens: 3, total_tokens: 15 }
 )
 
-# Get an observation
-observation = client.observations.get('obs-123')
+# Retrieve / list
+obs   = client.observations.get('obs-001')
+list  = client.observations.list(trace_id: 'trace-001', type: 'GENERATION')
 
-# List observations
-observations = client.observations.list(trace_id: 'trace-123')
+# Update
+client.observations.update('obs-001', metadata: { latency_ms: 430 })
 ```
 
-### Creating Scores
+Supported `type` values: `GENERATION`, `SPAN`, `EVENT`.
+
+Nest observations with `parent_observation_id` to model complex multi-step pipelines.
+
+### Scores
 
 ```ruby
-# Create a score
-score = client.scores.create(
-  id: 'score-123',
-  trace_id: 'trace-123',
-  name: 'quality',
-  value: 0.8,
-  comment: 'Good response quality'
+# Score a trace
+client.scores.create(
+  id:       'score-001',
+  trace_id: 'trace-001',
+  name:     'helpfulness',
+  value:    0.9,
+  comment:  'Clear and accurate answer'
 )
 
-# List scores
-scores = client.scores.list(trace_id: 'trace-123')
+# Score a specific observation
+client.scores.create(
+  id:             'score-002',
+  trace_id:       'trace-001',
+  observation_id: 'obs-001',
+  name:           'accuracy',
+  value:          1.0
+)
+
+# List / delete
+client.scores.list(trace_id: 'trace-001')
+client.scores.delete('score-001')
 ```
 
-### Working with Datasets
+### Prompts
+
+```ruby
+# Create a versioned prompt
+client.prompts.create(
+  name:      'support-greeter',
+  prompt:    'You are a helpful support agent. Greet {{user_name}} and ask how you can help.',
+  type:      'text',       # or 'chat'
+  is_active: true,
+  config:    { temperature: 0.7 }
+)
+
+# Retrieve (latest, by version, or by label)
+prompt = client.prompts.get('support-greeter')
+prompt = client.prompts.get('support-greeter', version: 2)
+prompt = client.prompts.get('support-greeter', label: 'production')
+
+# List
+client.prompts.list(label: 'production', limit: 10)
+```
+
+### Datasets
 
 ```ruby
 # Create a dataset
-dataset = client.datasets.create(
-  name: 'my-dataset',
-  description: 'Test dataset for evaluation'
-)
+client.datasets.create(name: 'qa-eval', description: 'Q&A evaluation set')
 
-# Add items to dataset
-item = client.datasets.create_item(
-  dataset_name: 'my-dataset',
-  input: { question: 'What is 2+2?' },
+# Add items
+client.datasets.create_item(
+  dataset_name:    'qa-eval',
+  input:           { question: 'What is 2 + 2?' },
   expected_output: { answer: '4' }
 )
 
-# List dataset items
-items = client.datasets.list_items('my-dataset')
+# List items and runs
+client.datasets.list_items('qa-eval', limit: 50)
+
+# Dataset runs
+client.datasets.create_run(dataset_name: 'qa-eval', name: 'run-20260611')
+client.datasets.list_runs('qa-eval')
 ```
 
-### Managing Prompts
-
-```ruby
-# Create a prompt
-prompt = client.prompts.create(
-  name: 'chat-prompt',
-  prompt: 'You are a helpful assistant. Answer: {{question}}',
-  config: { temperature: 0.7, max_tokens: 100 }
-)
-
-# Get a prompt
-prompt = client.prompts.get('chat-prompt', version: 1)
-
-# List prompts
-prompts = client.prompts.list()
-```
-
-## Error Handling
-
-The gem defines custom error classes:
+### Error Handling
 
 ```ruby
 begin
-  client.traces.create(id: 'test')
+  client.traces.create(id: 'trace-x', name: 'test')
 rescue Langfuse::AuthenticationError => e
-  puts "Authentication failed: #{e.message}"
+  puts "Bad credentials: #{e.message}"
 rescue Langfuse::APIError => e
   puts "API error: #{e.message}"
 rescue Langfuse::Error => e
-  puts "General error: #{e.message}"
+  puts "Client error: #{e.message}"
 end
 ```
 
+## API Coverage
+
+| Resource     | create | get | list | update | delete |
+|-------------|:------:|:---:|:----:|:------:|:------:|
+| Traces       | ✓      | ✓   | ✓    | ✓      |        |
+| Observations | ✓      | ✓   | ✓    | ✓ *    |        |
+| Scores       | ✓      | ✓   | ✓    |        | ✓      |
+| Prompts      | ✓      | ✓   | ✓    |        |        |
+| Datasets     | ✓      | ✓   | ✓    |        |        |
+| Dataset Items| ✓      | ✓   | ✓    |        |        |
+| Dataset Runs | ✓      | ✓   | ✓    |        |        |
+
+\* `observations.update` calls `PUT /api/public/observations/:id`, which is not part of the official Langfuse API. It will be reworked to use ingestion-based span/generation updates in a future release (see Roadmap).
+
+## Roadmap
+
+### Now
+- **OTEL ingestion mode** — migrate from the deprecated `POST /api/public/ingestion` batch endpoint to OTLP/HTTP (`/api/public/otel/v1/traces`); required to keep the gem functional long-term
+- **`environment` field support** — pass environment to trace/observation bodies per the current Langfuse API
+- **Type-specific observation helpers** — `trace.generation()` / `trace.span()` / `trace.event()` convenience methods
+
+### Next
+- **Async batch flush** — background thread with `Mutex` to buffer and flush events non-blocking
+- **Sessions API** — create and retrieve sessions
+- **Score Configs API** — manage score configuration definitions
+- **Comments API** — attach and list comments on traces and observations
+- **Gem rename and RubyGems publish prep** — rename to `langfuse-client` (or similar available name) and publish to RubyGems.org
+
+### Later
+- **Rails Railtie** — auto-instrument via `ActiveSupport::Notifications` with zero config
+- **Models API** — retrieve model definitions from Langfuse
+- **`PromptTemplate` class** — typed wrapper with client-side variable interpolation
+- **Annotation Queues API** — support for annotation queue management
+
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests.
+```bash
+bundle install
+bundle exec rake spec
+```
 
-To install this gem onto your local machine, run `bundle exec rake install`.
-
-## Contributing
-
-Bug reports and pull requests are welcome on GitHub at https://github.com/your-username/langfuse-ruby.
+Tests use [RSpec](https://rspec.info/) and [WebMock](https://github.com/bblimke/webmock) for HTTP stubbing.
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+MIT License — see [LICENSE](LICENSE) for details.
